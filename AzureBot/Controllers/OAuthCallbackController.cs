@@ -50,12 +50,12 @@
                     await client.Messages.SendMessageAsync(reply);
                 }
 
-                return Request.CreateResponse("You are now logged in! Continue talking to the bot.");
+                return Request.CreateResponse(BotMessages.OAuthCallback_LoggedIn);
             }
             else
             {
                 // Callback is called with no pending message as a result the login flow cannot be resumed.
-                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, new InvalidOperationException("Cannot resume!"));
+                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, new InvalidOperationException(BotMessages.OAuthCallback_CannotResume));
             }
         }
     }

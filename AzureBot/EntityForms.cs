@@ -15,7 +15,7 @@
             return new FormBuilder<SubscriptionFormState>()
                 .Field(new FieldReflector<SubscriptionFormState>(nameof(SubscriptionFormState.SubscriptionId))
                 .SetType(null)
-                .SetPrompt(new PromptAttribute("Please select the subscription you want to work with: {||}"))
+                .SetPrompt(new PromptAttribute(BotMessages.EntityForms_SubscriptionForm_Prompt))
                 .SetDefine((state, field) =>
                 {
                     foreach (var sub in state.AvailableSubscriptions)
@@ -35,7 +35,7 @@
                 .Field(nameof(VirtualMachineFormState.Operation), (state) => false)
                 .Field(new FieldReflector<VirtualMachineFormState>(nameof(VirtualMachineFormState.VirtualMachine))
                 .SetType(null)
-                .SetPrompt(new PromptAttribute("Please select the virtual machine you want to {Operation}: {||}"))
+                .SetPrompt(new PromptAttribute(BotMessages.EntityForms_VirtualMachineForm_Prompt))
                 .SetDefine((state, field) =>
                 {
                     foreach (var vm in state.AvailableVMs)
@@ -47,7 +47,7 @@
 
                     return Task.FromResult(true);
                 }))
-               .Confirm("Would you like to {Operation} virtual machine '{VirtualMachine}'?")
+               .Confirm(BotMessages.EntityForms_VirtualMachineForm_Confirm)
                .Build();
         }
 

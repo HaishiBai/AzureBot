@@ -1,6 +1,7 @@
 ﻿namespace AzureBot.Dialogs
 {
     using System;
+    using System.Globalization;
     using System.Threading.Tasks;
     using Helpers;
     using Microsoft.Bot.Builder.Dialogs;
@@ -37,7 +38,7 @@
                 context.PerUserInConversationData.SetValue(ContextConstants.AuthTokenKey, token);
                 context.PerUserInConversationData.SetValue(ContextConstants.OriginalMessageKey, this.originalMessageText);
 
-                context.Done($"Thanks {user}. You are now logged in.");
+                context.Done(string.Format(CultureInfo.CurrentCulture, BotMessages.AzureAuthDialog_LoggedIn, user));
             }
             else
             {
@@ -54,7 +55,7 @@
 
                 var authenticationUrl = await AzureActiveDirectoryHelper.GetAuthUrlAsync(this.resumptionCookie);
 
-                await context.PostAsync($"You must be authenticated in Azure to access your subscription. Please, use the following url to log into your Azure account: {authenticationUrl}");
+                await context.PostAsync(string.Format(CultureInfo.CurrentCulture, BotMessages.AzureAuthDialog_NeedToLogIn, authenticationUrl));
 
                 context.Wait(this.MessageReceivedAsync);
             }
