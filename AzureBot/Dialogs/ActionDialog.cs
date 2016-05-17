@@ -21,10 +21,12 @@
         private readonly string originalMessage;
 
         private readonly ILuisService luisService;
+        private bool exitAfterIntent;
 
-        public ActionDialog(string originalMessage)
+        public ActionDialog(string originalMessage, bool exitAfterIntent = false)
         {
             this.originalMessage = originalMessage;
+            this.exitAfterIntent = exitAfterIntent;
 
             if (this.luisService == null)
             {
@@ -244,7 +246,14 @@
                 await context.PostAsync("You have canceled the operation. What would you like to do next?");
             }
 
-            context.Wait(this.MessageReceived);
+            if (this.exitAfterIntent)
+            {
+                context.Done(string.Empty);
+            }
+            else
+            {
+                context.Wait(this.MessageReceived);
+            }
         }
     }
 }

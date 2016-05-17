@@ -1,5 +1,6 @@
 ﻿namespace AzureBot
 {
+    using System;
     using System.Threading.Tasks;
     using System.Web.Http;
     using Azure.Management.ResourceManagement;
@@ -31,9 +32,7 @@
         private static IDialog<string> MakeRoot()
         {
             return Chain.PostToChain()
-                .ContinueWith<Message, string>(MessageDialogCallback)
-                .ContinueWith<string, string>(AzureSubscriptionDialogCallback)
-                .ContinueWith<string, string>(AzureActionsDialogCallback);
+                .ContinueWith<Message, string>(MessageDialogCallback);
         }
 
         private static async Task<IDialog<string>> MessageDialogCallback(IBotContext context, IAwaitable<Message> message)
@@ -50,33 +49,9 @@
             {
                 await context.PostAsync(msg);
             }
-            
-            return Chain.Return(msg);
-        }
 
-        private static async Task<IDialog<string>> AzureSubscriptionDialogCallback(IBotContext context, IAwaitable<string> message)
-        {
-            var msg = await message;
-
-            var accessToken = context.GetAccessToken();
-
-            var availableSubscriptions = await new AzureRepository().ListSubscriptionsAsync(accessToken);
-
-            var form = new FormDialog<SubscriptionFormState>(
-                new SubscriptionFormState(availableSubscriptions),
-                EntityForms.BuildSubscriptionForm,
-                FormOptions.PromptInStart);
-
-            return Chain.ContinueWith(form, AzureSubscriptionDialogContinuation);
-        }
-
-        private static async Task<IDialog<string>> AzureSubscriptionDialogContinuation(IBotContext context, IAwaitable<SubscriptionFormState> result)
-        {
-            var subscriptionFormState = await result;
-
-            context.StoreSubscriptionId(subscriptionFormState.SubscriptionId);
-
-            return Chain.Return(subscriptionFormState.DisplayName);
+            string intent = "use subscription";
+            return Chain.ContinueWith<string, string>(new ActionDialog(intent, true), AzureActionsDialogCallback);
         }
 
         private static async Task<IDialog<string>> AzureActionsDialogCallback(IBotContext context, IAwaitable<string> message)
