@@ -1,5 +1,6 @@
 ﻿namespace AzureBot.Azure.Management.ResourceManagement
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
@@ -9,6 +10,14 @@
     using Models;
     using AzureModels = Microsoft.Azure.Management.Automation.Models;
     using TokenCredentials = Microsoft.Azure.TokenCloudCredentials;
+
+    [Serializable]
+    public enum OperationStatus
+    {
+        InProgress = 1,
+        Failed = 2,
+        Succeeded = 3,
+    }
 
     public class AzureRepository
     {
@@ -84,13 +93,24 @@
             }
         }
 
-        public async Task<bool> StartVirtualMachineAsync(string accessToken, string subscriptionId, string resourceGroupName, string virtualMachineName)
+        public async Task<string> StartVirtualMachineAsync(string accessToken, string subscriptionId, string resourceGroupName, string virtualMachineName)
         {
             var credentials = new TokenCredentials(subscriptionId, accessToken);
             using (var client = new ComputeManagementClient(credentials))
             {
-                var status = await client.VirtualMachines.StartAsync(resourceGroupName, virtualMachineName);
-                return status.Status != Microsoft.Azure.Management.Compute.Models.ComputeOperationStatus.Failed;
+                var status = await client.VirtualMachines.BeginStartingAsync(resourceGroupName, virtualMachineName);
+                return status.AzureAsyncOperation;
+            }
+        }
+
+        public async Task<OperationStatus> GetVirtualMachineLongRunningOperationStatusAsync(string accessToken, string subscriptionId, string operationStatus)
+        {
+            var credentials = new TokenCredentials(subscriptionId, accessToken);
+            using (var client = new ComputeManagementClient(credentials))
+            {
+                var status = await client.GetLongRunningOperationStatusAsync(operationStatus).ConfigureAwait(false);
+
+                return (OperationStatus)Enum.Parse(typeof(OperationStatus), status.Status.ToString());
             }
         }
 
@@ -126,6 +146,6 @@
             var segments = id.Split('/');
             var resourceGroupName = segments.SkipWhile(segment => segment != "resourceGroups").ElementAtOrDefault(1);
             return resourceGroupName;
-    }
+        }
     }
 }

@@ -5,12 +5,15 @@
     using System.Linq;
     using System.Reflection;
     using System.Threading.Tasks;
+    using Autofac;
     using Azure.Management.ResourceManagement;
     using FormTemplates;
     using Microsoft.Bot.Builder.Dialogs;
+    using Microsoft.Bot.Builder.Dialogs.Internals;
     using Microsoft.Bot.Builder.FormFlow;
     using Microsoft.Bot.Builder.Luis;
     using Microsoft.Bot.Builder.Luis.Models;
+    using Microsoft.Bot.Connector;
 
     [LuisModel("c9e598cb-0e5f-48f6-b14a-ebbb390a6fb3", "a7c1c493d0e244e796b83c6785c4be4d")]
     [Serializable]
@@ -176,6 +179,41 @@
             context.Call(form, this.RunBookFormComplete);
         }
 
+        private static async Task CheckLongRunningOperationStatus(
+            IDialogContext context,
+            string operationUri,
+            Func<string, string, string, Task<OperationStatus>> getOperationStatusAsync,
+            Func<OperationStatus, string> getOperationResultMessage,
+            int delayBetweenPoolingInSeconds = 2)
+        {
+            var operationStatus = OperationStatus.InProgress;
+            var accessToken = context.GetAccessToken();
+            var subscriptionId = context.GetSubscriptionId();
+
+            while (operationStatus == OperationStatus.InProgress)
+            {
+                operationStatus = await getOperationStatusAsync(accessToken, subscriptionId, operationUri).ConfigureAwait(false);
+
+                await Task.Delay(TimeSpan.FromSeconds(delayBetweenPoolingInSeconds)).ConfigureAwait(false);
+            }
+
+            ResumptionCookie resumptionCookie;
+            if (context.PerUserInConversationData.TryGetValue(ContextConstants.PersistedCookieKey, out resumptionCookie))
+            {
+                var reply = resumptionCookie.GetMessage();
+                var to = reply.To;
+                reply.To = reply.From;
+                reply.From = to;
+                reply.Text = getOperationResultMessage(operationStatus);
+
+                using (var scope = DialogModule.BeginLifetimeScope(Conversation.Container, reply))
+                {
+                    var client = scope.Resolve<IConnectorClient>();
+                    await client.Messages.SendMessageAsync(reply);
+                }
+            }
+        }
+
         private async Task RunBookFormComplete(IDialogContext context, IAwaitable<RunBookFormState> result)
         {
             try
@@ -209,11 +247,21 @@
                 await context.PostAsync($"Starting the {virtualMachineFormState.VirtualMachine} virtual machine.");
 
                 var accessToken = context.GetAccessToken();
-                await new AzureRepository().StartVirtualMachineAsync(
+                var operationUri = await new AzureRepository().StartVirtualMachineAsync(
                     accessToken,
                     virtualMachineFormState.SelectedVM.SubscriptionId,
                     virtualMachineFormState.SelectedVM.ResourceGroup,
                     virtualMachineFormState.SelectedVM.Name);
+
+               CheckLongRunningOperationStatus(
+                   context, 
+                   operationUri, 
+                   new AzureRepository().GetVirtualMachineLongRunningOperationStatusAsync,
+                   (operationResult) =>
+                   {
+                       var statusMessage = operationResult == OperationStatus.Succeeded ? "was started successfully" : "failed to stop";
+                       return $"The {virtualMachineFormState.VirtualMachine} virtual machine {statusMessage}.";
+                   });
             }
             catch (FormCanceledException<VirtualMachineFormState>)
             {
