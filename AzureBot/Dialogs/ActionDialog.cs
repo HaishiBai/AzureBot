@@ -197,20 +197,13 @@
                 await Task.Delay(TimeSpan.FromSeconds(delayBetweenPoolingInSeconds)).ConfigureAwait(false);
             }
 
-            ResumptionCookie resumptionCookie;
-            if (context.PerUserInConversationData.TryGetValue(ContextConstants.PersistedCookieKey, out resumptionCookie))
-            {
-                var reply = resumptionCookie.GetMessage();
-                var to = reply.To;
-                reply.To = reply.From;
-                reply.From = to;
-                reply.Text = getOperationResultMessage(operationStatus);
+            var reply = context.MakeMessage();
+            reply.Text = getOperationResultMessage(operationStatus);
 
-                using (var scope = DialogModule.BeginLifetimeScope(Conversation.Container, reply))
-                {
-                    var client = scope.Resolve<IConnectorClient>();
-                    await client.Messages.SendMessageAsync(reply);
-                }
+            using (var scope = DialogModule.BeginLifetimeScope(Conversation.Container, reply))
+            {
+                var client = scope.Resolve<IConnectorClient>();
+                await client.Messages.SendMessageAsync(reply);
             }
         }
 
@@ -225,9 +218,9 @@
 
                 await new AzureRepository().StartRunBookAsync(
                     accessToken,
-                    runBookFormState.SelectedAutomationAccount.SubscriptionId, 
+                    runBookFormState.SelectedAutomationAccount.SubscriptionId,
                     runBookFormState.SelectedAutomationAccount.ResourceGroup,
-                    runBookFormState.SelectedAutomationAccount.AutomationAccountName, 
+                    runBookFormState.SelectedAutomationAccount.AutomationAccountName,
                     runBookFormState.RunBookName);
             }
             catch (FormCanceledException<VirtualMachineFormState>)
@@ -253,15 +246,15 @@
                     virtualMachineFormState.SelectedVM.ResourceGroup,
                     virtualMachineFormState.SelectedVM.Name);
 
-               CheckLongRunningOperationStatus(
-                   context, 
-                   operationUri, 
-                   new AzureRepository().GetVirtualMachineLongRunningOperationStatusAsync,
-                   (operationResult) =>
-                   {
-                       var statusMessage = operationResult == OperationStatus.Succeeded ? "was started successfully" : "failed to stop";
-                       return $"The {virtualMachineFormState.VirtualMachine} virtual machine {statusMessage}.";
-                   });
+                CheckLongRunningOperationStatus(
+                    context,
+                    operationUri,
+                    new AzureRepository().GetVirtualMachineLongRunningOperationStatusAsync,
+                    (operationResult) =>
+                    {
+                        var statusMessage = operationResult == OperationStatus.Succeeded ? "was started successfully" : "failed to stop";
+                        return $"The {virtualMachineFormState.VirtualMachine} virtual machine {statusMessage}.";
+                    });
             }
             catch (FormCanceledException<VirtualMachineFormState>)
             {
@@ -282,7 +275,7 @@
                 var selectedVM = virtualMachineFormState.SelectedVM;
                 var accessToken = context.GetAccessToken();
                 await new AzureRepository().StopVirtualMachineAsync(
-                    accessToken, 
+                    accessToken,
                     virtualMachineFormState.SelectedVM.SubscriptionId,
                     virtualMachineFormState.SelectedVM.ResourceGroup,
                     virtualMachineFormState.SelectedVM.Name);
