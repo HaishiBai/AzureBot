@@ -130,6 +130,7 @@
     <Compile Include="FormTemplates\Operations.cs" />
     <Compile Include="FormTemplates\RunBookFormState.cs" />
     <Compile Include="FormTemplates\SubscriptionFormState.cs" />
+    <Compile Include="FormTemplates\ScaleSetFormState.cs" />
     <Compile Include="FormTemplates\VirtualMachineFormState.cs" />
     <Compile Include="Helpers\AzureActiveDirectoryHelper.cs" />
     <Compile Include="Controllers\MessagesController.cs" />

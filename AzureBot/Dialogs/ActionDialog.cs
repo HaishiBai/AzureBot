@@ -12,7 +12,7 @@
     using Microsoft.Bot.Builder.Luis;
     using Microsoft.Bot.Builder.Luis.Models;
 
-    [LuisModel("1b58a513-e98a-4a13-a5c4-f61ac6dc6c84", "0e64d2ae951547f692182b4ae74262cb")]
+    [LuisModel("4b27ef76-b55a-4fab-97f0-019a93058850", "f8fc24268b844bfb9eda87800099e88f")]
     [Serializable]
     public class ActionDialog : LuisDialog<string>
     {
@@ -176,6 +176,22 @@
             context.Call(form, this.RunBookFormComplete);
         }
 
+        [LuisIntent("ResizeScaleSet")]
+        public async Task ResizeScaleSetAsync(IDialogContext context, LuisResult result)
+        {
+            var accessToken = context.GetAccessToken();
+            var subscriptionId = context.GetSubscriptionId();
+
+            var availableScaleSets = (await new AzureRepository().ListScaleSetsAsync(accessToken, subscriptionId))
+                                .ToArray();
+
+            var form = new FormDialog<ScaleSetFormState>(
+                new ScaleSetFormState(availableScaleSets, Operations.Scale),
+                EntityForms.BuildScaleSetsForm,
+                FormOptions.PromptInStart,
+                result.Entities);
+            context.Call(form, this.ScaleScaleSetFormComplete);
+        }
         private async Task RunBookFormComplete(IDialogContext context, IAwaitable<RunBookFormState> result)
         {
             try
@@ -214,6 +230,29 @@
                     virtualMachineFormState.SelectedVM.SubscriptionId,
                     virtualMachineFormState.SelectedVM.ResourceGroup,
                     virtualMachineFormState.SelectedVM.Name);
+            }
+            catch (FormCanceledException<VirtualMachineFormState>)
+            {
+                await context.PostAsync("You have canceled the operation. What would you like to do next?");
+            }
+
+            context.Wait(this.MessageReceived);
+        }
+
+        private async Task ScaleScaleSetFormComplete(IDialogContext context, IAwaitable<ScaleSetFormState> result)
+        {
+            try
+            {
+                var scaleSetFormState = await result;
+
+                await context.PostAsync($"Scaling the {scaleSetFormState.ScaleSet} scale set.");
+
+                var accessToken = context.GetAccessToken();
+                await new AzureRepository().ScaleScaleSetAsync(
+                    accessToken,
+                    scaleSetFormState.SelectedScaleSet.SubscriptionId,
+                    scaleSetFormState.SelectedScaleSet.ResourceGroup,
+                    scaleSetFormState.SelectedScaleSet.Name);
             }
             catch (FormCanceledException<VirtualMachineFormState>)
             {

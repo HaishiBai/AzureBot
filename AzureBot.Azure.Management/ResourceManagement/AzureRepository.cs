@@ -8,13 +8,13 @@
     using Microsoft.Azure.Subscriptions;
     using Models;
     using AzureModels = Microsoft.Azure.Management.Automation.Models;
-    using TokenCredentials = Microsoft.Azure.TokenCloudCredentials;
-
+    using Microsoft.Azure;
+    using Microsoft.Rest;
     public class AzureRepository
     {
         public async Task<IEnumerable<Subscription>> ListSubscriptionsAsync(string accessToken)
         {
-            var credentials = new TokenCredentials(accessToken);
+            var credentials = new TokenCloudCredentials(accessToken);
 
             using (SubscriptionClient client = new SubscriptionClient(credentials))
             {
@@ -26,21 +26,49 @@
 
         public async Task<IEnumerable<VirtualMachine>> ListVirtualMachinesAsync(string accessToken, string subscriptionId)
         {
-            var credentials = new TokenCredentials(subscriptionId, accessToken);
+            var credentials = new TokenCredentials(accessToken);
+            
             using (var client = new ComputeManagementClient(credentials))
             {
-                var virtualMachinesResult = await client.VirtualMachines.ListAllAsync(null);
-                var all = virtualMachinesResult.VirtualMachines.Select(async (vm) =>
+                client.SubscriptionId = subscriptionId;
+                var virtualMachinesResult = await client.VirtualMachines.ListAllAsync();
+                var all = virtualMachinesResult.Select(async (vm) =>
                 {
                     var resourceGroupName = GetResourceGroup(vm.Id);
-                    var response = await client.VirtualMachines.GetWithInstanceViewAsync(resourceGroupName, vm.Name);
-                    var vmStatus = response.VirtualMachine.InstanceView.Statuses.Where(p => p.Code.StartsWith("PowerState/")).FirstOrDefault();
+                    var response = await client.VirtualMachines.GetAsync(resourceGroupName, vm.Name);
+                    //var vmStatus = response.InstanceView.Statuses.Where(p => p.Code.StartsWith("PowerState/")).FirstOrDefault();
                     return new VirtualMachine
                     {
                         SubscriptionId = subscriptionId,
                         ResourceGroup = resourceGroupName,
                         Name = vm.Name,
-                        Status = vmStatus?.DisplayStatus ?? "NA"
+                        Status = "NA" //vmStatus?.DisplayStatus ?? "NA"
+                    };
+                });
+
+                return await Task.WhenAll(all.ToArray());
+            }
+        }
+        public async Task<IEnumerable<ScaleSet>> ListScaleSetsAsync(string accessToken, string subscriptionId)
+        {
+            var credentials = new TokenCredentials(accessToken);
+            
+            
+            using (var client = new ComputeManagementClient(credentials))
+            {
+                client.SubscriptionId = subscriptionId;
+                var virtualMachinesResult = await client.VirtualMachineScaleSets.ListAllAsync();
+                var all = virtualMachinesResult.Select(async (vm) =>
+                {
+                    var resourceGroupName = GetResourceGroup(vm.Id);
+                    var response = await client.VirtualMachineScaleSets.GetAsync(resourceGroupName, vm.Name);
+                    return new ScaleSet
+                    {
+                        SubscriptionId = subscriptionId,
+                        ResourceGroup = resourceGroupName,
+                        Name = vm.Name,
+                        Status = response.ProvisioningState,
+                        Capacity = response.Sku.Capacity ?? 0
                     };
                 });
 
@@ -50,7 +78,7 @@
 
         public async Task<IEnumerable<AutomationAccount>> ListAutomationAccountsAsync(string accessToken, string subscriptionId)
         {
-            var credentials = new TokenCredentials(subscriptionId, accessToken);
+            var credentials = new TokenCloudCredentials(subscriptionId, accessToken);
 
             using (var automationClient = new AutomationManagementClient(credentials))
             {
@@ -71,7 +99,7 @@
 
         public async Task<IEnumerable<RunBook>> ListAutomationRunBooks(string accessToken, string subscriptionId, string resourceGroupName, string automationAccountName)
         {
-            var credentials = new TokenCredentials(subscriptionId, accessToken);
+            var credentials = new TokenCloudCredentials(subscriptionId, accessToken);
 
             using (var automationClient = new AutomationManagementClient(credentials))
             {
@@ -86,27 +114,45 @@
 
         public async Task<bool> StartVirtualMachineAsync(string accessToken, string subscriptionId, string resourceGroupName, string virtualMachineName)
         {
-            var credentials = new TokenCredentials(subscriptionId, accessToken);
+            var credentials = new TokenCredentials(accessToken);
             using (var client = new ComputeManagementClient(credentials))
             {
-                var status = await client.VirtualMachines.StartAsync(resourceGroupName, virtualMachineName);
-                return status.Status != Microsoft.Azure.Management.Compute.Models.ComputeOperationStatus.Failed;
+                client.SubscriptionId = subscriptionId;
+                var statusTask = client.VirtualMachines.StartAsync(resourceGroupName, virtualMachineName);
+                statusTask.Wait();
+                return statusTask.IsCompleted;
             }
         }
 
-        public async Task<bool> StopVirtualMachineAsync(string accessToken, string subscriptionId, string resourceGroupName, string virtualMachineName)
+        public async Task<bool> ScaleScaleSetAsync(string accessToken, string subscriptionId, string resourceGroupName, string scaleSetName)
+        {
+            var credentials = new TokenCredentials(accessToken);
+            using (var client = new ComputeManagementClient(credentials))
+            {
+                client.SubscriptionId = subscriptionId;
+                var scaleSet = await client.VirtualMachineScaleSets.GetAsync(resourceGroupName, scaleSetName);
+                scaleSet.Sku.Capacity = 4;
+                var statusTask = client.VirtualMachineScaleSets.BeginCreateOrUpdateAsync(resourceGroupName, scaleSetName, scaleSet);
+                statusTask.Wait();
+                return statusTask.IsCompleted;
+            }
+
+        }
+
+            public async Task<bool> StopVirtualMachineAsync(string accessToken, string subscriptionId, string resourceGroupName, string virtualMachineName)
         {
             var credentials = new TokenCredentials(subscriptionId, accessToken);
             using (var client = new ComputeManagementClient(credentials))
             {
-                var status = await client.VirtualMachines.PowerOffAsync(resourceGroupName, virtualMachineName);
-                return status.Status != Microsoft.Azure.Management.Compute.Models.ComputeOperationStatus.Failed;
+                var statusTask = client.VirtualMachines.PowerOffAsync(resourceGroupName, virtualMachineName);
+                statusTask.Wait();
+                return statusTask.IsCompleted;
             }
         }
 
         public async Task<bool> StartRunBookAsync(string accessToken, string subscriptionId, string resourceGroupName, string automationAccountName, string runBookName)
         {
-            var credentials = new TokenCredentials(subscriptionId, accessToken);
+            var credentials = new TokenCloudCredentials(subscriptionId, accessToken);
 
             using (var client = new AutomationManagementClient(credentials))
             {

@@ -7,6 +7,8 @@
     {
         Start = 1,
 
-        Stop
+        Stop = 2,
+
+        Scale = 3
     }
 }

@@ -52,6 +52,27 @@
                .Confirm("Would you like to {Operation} virtual machine '{VirtualMachine}'?")
                .Build();
         }
+        public static IForm<ScaleSetFormState> BuildScaleSetsForm()
+        {
+            return new FormBuilder<ScaleSetFormState>()
+                .Field(nameof(ScaleSetFormState.Operation), (state) => false)
+                .Field(new FieldReflector<ScaleSetFormState>(nameof(ScaleSetFormState.ScaleSet))
+                .SetType(null)
+                .SetPrompt(PerLinePromptAttribute("Please select the scale set you want to {Operation}: {||}"))
+                .SetDefine((state, field) =>
+                {
+                    foreach (var ss in state.AvailableScaleSets)
+                    {
+                        field
+                            .AddDescription(ss.Name, ss.Name)
+                            .AddTerms(ss.Name, ss.Name);
+                    }
+
+                    return Task.FromResult(true);
+                }))
+               .Confirm("Would you like to {Operation} '{ScaleSet}'?")
+               .Build();
+        }
 
         public static IForm<RunBookFormState> BuildRunBookForm()
         {
